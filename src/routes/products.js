@@ -1,35 +1,53 @@
+// routes/products.js
 import { Router } from "express";
+import db from "../firebase.js"; 
 
 const router = Router();
-let products = [];
 
-router.post("/", (req, res) => {
-  const { name, price } = req.body;
+// Create a new product
+router.post("/", async (req, res) => {
+  try {
+    const { name, price } = req.body;
+    if (!name || !price) {
+      return res.status(400).json({ message: "Name and price are required" });
+    }
 
-  if (!name || !price) {
-    return res.status(400).json({ message: "Name and price are required" });
+    const docRef = await db.collection("products").add({ name, price });
+    const newProduct = { id: docRef.id, name, price };
+    res.status(201).json(newProduct);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Server error" });
   }
-
-  const newProduct = {
-    id: products.length + 1,
-    name,
-    price
-  };
-
-  products.push(newProduct);
-  res.status(201).json(newProduct);
 });
 
-router.get("/", (req, res) => {
-  res.json(products);
+// Get all products
+router.get("/", async (req, res) => {
+  try {
+    const snapshot = await db.collection("products").get();
+    const products = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    res.json(products);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Server error" });
+  }
 });
 
-router.get("/:id", (req, res) => {
-  const product = products.find(p => p.id === parseInt(req.params.id));
-  if (!product) {
-    return res.status(404).json({ message: "Product not found" });
+// Get product by ID
+router.get("/:id", async (req, res) => {
+  try {
+    const docRef = db.collection("products").doc(req.params.id);
+    const doc = await docRef.get();
+
+    if (!doc.exists) {
+      return res.status(404).json({ message: "Product not found" });
+    }
+
+    res.json({ id: doc.id, ...doc.data() });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Server error" });
   }
-  res.json(product);
 });
 
 export default router;
